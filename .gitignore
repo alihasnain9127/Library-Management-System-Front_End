@@ -1,0 +1,118 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# ── Dependencies ──
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ── Testing ──
+/coverage
+/test-results/
+playwright-report/
+playwright/.cache/
+cypress/videos/
+cypress/screenshots/
+
+# ── Next.js Build Output ──
+/.next/
+/out/
+/build/
+.next/static/css/*.map
+.next/static/chunks/*.map
+
+# ── Environment & Secrets (CRITICAL: never commit these) ──
+.env
+.env.local
+.env.*.local
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.jks
+*.keystore
+secrets/
+credentials/
+
+# ── Production Build Artifacts ──
+/production/
+/static/
+
+# ── Vercel & Deployment ──
+.vercel
+.now
+
+# ── TypeScript & Build Cache ──
+*.tsbuildinfo
+next-env.d.ts
+.tsbuildinfo
+.eslintcache
+.stylelintcache
+
+# ── OS Files ──
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ── IDE & Editor ──
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+
+# ── Logs & Diagnostics ──
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# ── Temporary Files ──
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.pid
+
+# ── Security Reports (may contain sensitive info) ──
+secrets-scan-report.json
+security-audit-report.json
+npm-audit-report.json
+sast-report.json
+pen-test-report.*
+
+# ── Storybook & Dev Tools ──
+storybook-static/
+.cache/
+.parcel-cache/
+
+# ── Package Manager ──
+# package-lock.json  # Uncomment to ignore lockfile
+
+# ── Images & Media (if not required) ──
+# uploads/
+# public/uploads/
