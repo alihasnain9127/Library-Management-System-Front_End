@@ -12,7 +12,7 @@ export default function RegisterPage() {
   const [serverError, setServerError] = useState('');
   const router = useRouter();
 
-  const { register, handleSubmit, control, formState: { errors, isValid, isSubmitting } } = useForm({
+  const { register, handleSubmit, control, clearErrors, setValue, formState: { errors, isValid, isSubmitting } } = useForm({
     mode: 'onChange'
   });
 
@@ -240,8 +240,11 @@ export default function RegisterPage() {
           <div className="flex items-start">
             <input
               {...register('terms', { 
-                onChange: clearError,
-                required: 'You must accept the Terms & Conditions'
+                onChange: (event) => {
+                  clearError();
+                  setValue('terms', event.target.checked, { shouldValidate: true });
+                },
+                validate: (value) => value === true || 'You must accept the Terms & Conditions'
               })}
               type="checkbox"
               id="terms"
