@@ -263,13 +263,13 @@ button {
    ============================================================ */
 .glass-surface {
   background: rgba(255, 255, 255, 0.80);
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 .dark .glass-surface {
   background: rgba(15, 23, 42, 0.80);
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 /* Card Elevation Utilities */
@@ -310,6 +310,7 @@ button {
   border-radius: 8px;
   transition: all 150ms var(--ease-out);
   outline: none;
+  -webkit-user-select: none;
   user-select: none;
 }
 .btn-base:active:not(:disabled) {
