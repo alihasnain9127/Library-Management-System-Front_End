@@ -5,9 +5,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchCirculationRecords } from '@/redux/slices/circulationSlice';
 import { calculateOverdueMetrics } from '@/utils/fineCalculator';
 import { format, parseISO } from 'date-fns';
-import { Wallet, ShieldAlert, CheckCircle, Hourglass } from 'lucide-react';
+import { Wallet, ShieldAlert, CheckCircle, Hourglass, DollarSign, BookOpen, AlertCircle } from 'lucide-react';
 
-export default function UserBorrowedAndFinesView() {
+export default function UserFinesView() {
   const dispatch = useDispatch();
   const { records, loading } = useSelector((state) => state.circulation);
 
@@ -15,92 +15,173 @@ export default function UserBorrowedAndFinesView() {
     dispatch(fetchCirculationRecords('user'));
   }, [dispatch]);
 
+  const isRecordActive = (rec) => {
+    const s = String(rec.status || '').toLowerCase();
+    return s === 'borrowed' || s === 'issued';
+  };
+
   // Aggregate outstanding liabilities
   const totalOutstandingFine = records.reduce((sum, rec) => {
-    if (rec.status === 'returned' && !rec.finePaid) return sum + (rec.fine || 0);
-    if (rec.status === 'borrowed') return sum + calculateOverdueMetrics(rec.returnDate).fineAmount;
+    const s = String(rec.status || '').toLowerCase();
+    const date = rec.returnDate || rec.dueDate;
+    if (s === 'returned' && !rec.finePaid) return sum + (rec.fine || rec.fineAmount || 0);
+    if (isRecordActive(rec)) return sum + calculateOverdueMetrics(date).fineAmount;
     return sum;
   }, 0);
 
+  const fineRecords = records.filter((rec) => {
+    const s = String(rec.status || '').toLowerCase();
+    const date = rec.returnDate || rec.dueDate;
+    const hasPastFine = (rec.fine || rec.fineAmount || 0) > 0;
+    const hasActiveFine = isRecordActive(rec) && calculateOverdueMetrics(date).daysOverdue > 0;
+    return hasPastFine || hasActiveFine;
+  });
+
   return (
     <div className="space-y-8">
-      {/* Dynamic Summary Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl flex items-center justify-between shadow-sm">
+      {/* ── Page Header ─────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+            Fines & Liabilities
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Review overdue fine assessments, outstanding balances, and receipt history.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+          <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+            Fine Rate: <strong>Rs. 20 / day</strong>
+          </span>
+        </div>
+      </div>
+
+      {/* ── Dynamic Summary Panel ────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div 
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl flex items-center justify-between transition-all"
+          style={{ boxShadow: 'var(--shadow-e1)' }}
+        >
           <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Accumulated Balance</span>
-            <h3 className="text-3xl font-extrabold text-slate-900 dark:text-slate-50 mt-1">Rs. {totalOutstandingFine}</h3>
-            <p className="text-xs text-slate-400 mt-1">Settle at main desk to resume full borrowing privileges.</p>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Total Outstanding Balance
+            </span>
+            <h3 className={`text-3xl font-extrabold tracking-tight mt-1 ${
+              totalOutstandingFine > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-slate-50'
+            }`}>
+              Rs. {totalOutstandingFine}
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              {totalOutstandingFine > 0 ? 'Settle at front circulation desk' : 'Zero outstanding balance'}
+            </p>
           </div>
-          <div className="p-4 bg-red-50 dark:bg-red-950/40 text-red-500 rounded-xl">
-            <Wallet className="w-8 h-8" />
+          <div className={`p-3.5 rounded-xl border ${
+            totalOutstandingFine > 0 
+              ? 'bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400 border-red-100 dark:border-red-900/30' 
+              : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border-slate-200 dark:border-slate-700'
+          }`}>
+            <Wallet className="w-7 h-7" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl flex items-center justify-between shadow-sm">
+        <div 
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl flex items-center justify-between transition-all"
+          style={{ boxShadow: 'var(--shadow-e1)' }}
+        >
           <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Book Holdings</span>
-            <h3 className="text-3xl font-extrabold text-blue-600 mt-1">
-              {records.filter(r => r.status === 'borrowed').length} Books
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Active Liabilities Count
+            </span>
+            <h3 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50 mt-1">
+              {fineRecords.length} {fineRecords.length === 1 ? 'Notice' : 'Notices'}
             </h3>
-            <p className="text-xs text-slate-400 mt-1">Check return schedules below to avoid overdue fines.</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Recorded across your academic borrowing history.
+            </p>
           </div>
-          <div className="p-4 bg-blue-50 dark:bg-blue-950/40 text-blue-500 rounded-xl">
-            <Hourglass className="w-8 h-8" />
+          <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-100 dark:border-amber-900/30">
+            <DollarSign className="w-7 h-7" />
           </div>
         </div>
       </div>
 
-      {/* Circulation History List */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm">
+      {/* ── Circulation Fines History ─────────────────────── */}
+      <div 
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden"
+        style={{ boxShadow: 'var(--shadow-e1)' }}
+      >
         <div className="p-5 border-b border-slate-100 dark:border-slate-800">
-          <h3 className="font-bold text-slate-900 dark:text-slate-50">Borrowing Ledger & Accountability Trail</h3>
+          <h3 className="font-bold text-slate-900 dark:text-slate-50 text-base">
+            Fine Ledgers & Accountability Record
+          </h3>
         </div>
-        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+        <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
           {loading ? (
-            <div className="p-8 text-center text-slate-400">Loading transaction history...</div>
+            <div className="p-12 text-center text-slate-400">Loading fine records…</div>
           ) : records.length === 0 ? (
-            <div className="p-8 text-center text-slate-400">No previous book transactions logged on this profile.</div>
+            <div className="p-12 text-center text-slate-400 flex flex-col items-center gap-2">
+              <BookOpen className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-1" />
+              <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">No transaction records</p>
+              <p className="text-xs">No library rentals are registered on your account.</p>
+            </div>
           ) : (
             records.map((rec) => {
-              const isReturned = rec.status === 'returned';
-              const metrics = calculateOverdueMetrics(rec.returnDate, rec.actualReturnDate);
+              const s = String(rec.status || '').toLowerCase();
+              const isReturned = s === 'returned';
+              const returnDate = rec.returnDate || rec.dueDate;
+              const metrics = calculateOverdueMetrics(returnDate, rec.actualReturnDate);
+              const assessedFine = rec.fine || rec.fineAmount || 0;
+              const currentFine = isReturned ? assessedFine : metrics.fineAmount;
               
               return (
-                <div key={rec._id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-colors">
+                <div 
+                  key={rec._id} 
+                  className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors"
+                >
                   <div className="space-y-1">
-                    <h4 className="font-bold text-slate-800 dark:text-slate-200 text-base">{rec.bookId?.title}</h4>
-                    <p className="text-xs text-slate-500">Author: <span className="font-medium text-slate-700 dark:text-slate-300">{rec.bookId?.author}</span></p>
+                    <h4 className="font-bold text-slate-900 dark:text-slate-50 text-base">
+                      {rec.bookId?.title || 'Academic Title'}
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Author: <span className="font-medium text-slate-700 dark:text-slate-300">{rec.bookId?.author || 'Unknown'}</span>
+                    </p>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400 pt-1">
                       <span>Borrowed: <strong>{rec.borrowDate ? format(parseISO(rec.borrowDate), 'dd MMM yyyy') : '—'}</strong></span>
-                      <span>Expected Return: <strong className="text-slate-600 dark:text-slate-300">{rec.returnDate ? format(parseISO(rec.returnDate), 'dd MMM yyyy') : '—'}</strong></span>
+                      <span>Target Due: <strong>{returnDate ? format(parseISO(returnDate), 'dd MMM yyyy') : '—'}</strong></span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4 sm:text-right shrink-0">
                     <div>
                       {isReturned ? (
-                        <div className="text-right">
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded">
-                            <CheckCircle className="w-3 h-3" /> Returned
+                        <div className="sm:text-right">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-900/40 px-2.5 py-0.5 rounded-full">
+                            <CheckCircle className="w-3.5 h-3.5" /> Returned
                           </span>
-                          {(rec.fine || 0) > 0 && (
-                            <p className="text-xs font-semibold mt-1 text-slate-500">
-                              Fine (Rs. {rec.fine}): {rec.finePaid ? 'Settled' : 'Unpaid'}
+                          {assessedFine > 0 ? (
+                            <p className={`text-xs font-semibold mt-1 ${rec.finePaid ? 'text-slate-500' : 'text-red-500 font-bold'}`}>
+                              Fine: Rs. {assessedFine} ({rec.finePaid ? 'Settled' : 'Unpaid'})
                             </p>
+                          ) : (
+                            <p className="text-xs text-slate-400 mt-1">Returned on time (Rs. 0)</p>
                           )}
                         </div>
                       ) : metrics.daysOverdue > 0 ? (
                         <div className="sm:text-right space-y-1">
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 dark:bg-red-950/20 px-2 py-0.5 rounded">
-                            <ShieldAlert className="w-3 h-3" /> Overdue by {metrics.daysOverdue} Days
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/40 border border-red-200/50 dark:border-red-900/40 px-2.5 py-0.5 rounded-full">
+                            <ShieldAlert className="w-3.5 h-3.5" /> {metrics.daysOverdue} Days Overdue
                           </span>
-                          <p className="text-xs font-bold text-red-500">Accruing Fine: Rs. {metrics.fineAmount}</p>
+                          <p className="text-xs font-bold text-red-600 dark:text-red-400">
+                            Accruing: Rs. {metrics.fineAmount}
+                          </p>
                         </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/20 px-2 py-0.5 rounded">
-                          Active Loan
-                        </span>
+                        <div className="sm:text-right">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-900/40 px-2.5 py-0.5 rounded-full">
+                            Active Loan
+                          </span>
+                          <p className="text-xs text-slate-400 mt-1">No overdue liability</p>
+                        </div>
                       )}
                     </div>
                   </div>

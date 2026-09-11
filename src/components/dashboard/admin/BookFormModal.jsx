@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import React, { useCallback, useEffect, useMemo, useRef, startTransition, useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { useDispatch, useSelector } from 'react-redux';
 import Image from 'next/image';
 import {
@@ -161,12 +161,12 @@ function CharCounter({ current, max }) {
   const overLimit = current > max;
   return (
     <div className="flex items-center justify-between mt-1.5 gap-3">
-      <div className={`text-xs font-medium tabular-nums ${overLimit ? 'text-red-600 dark:text-red-400' : nearLimit ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
+      <div className={`text-xs font-medium tabular-nums ${overLimit ? 'text-red-600 dark:text-red-400 font-bold' : nearLimit ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
         {current} / {max}
       </div>
-      <div className="flex-1 h-1 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+      <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
         <div
-          className={`h-full transition-all duration-200 ${overLimit ? 'bg-red-500' : nearLimit ? 'bg-amber-500' : 'bg-blue-500'}`}
+          className={`h-full transition-all duration-200 ${overLimit ? 'bg-red-500' : nearLimit ? 'bg-amber-500' : 'bg-emerald-500'}`}
           style={{ width: `${Math.min(100, percent)}%` }}
         />
       </div>
@@ -187,7 +187,7 @@ export default function BookFormModal({ isOpen, onClose, book = null }) {
     return [];
   }, [book]);
 
-  const { register, handleSubmit, reset, watch, setValue, setError, clearErrors, trigger, formState: { errors, isDirty } } = useForm({
+  const { register, handleSubmit, reset, control, setValue, setError, clearErrors, trigger, formState: { errors, isDirty } } = useForm({
     defaultValues: { quantity: 1, publishYear: new Date().getFullYear(), imageUrl: '', categories: [] },
     mode: 'onChange',
     reValidateMode: 'onChange',
@@ -195,10 +195,10 @@ export default function BookFormModal({ isOpen, onClose, book = null }) {
     shouldFocusError: true,
   });
 
-  const imageUrl = watch('imageUrl');
-  const titleValue = watch('title') || '';
-  const authorValue = watch('author') || '';
-  const descriptionValue = watch('description') || '';
+  const imageUrl = useWatch({ control, name: 'imageUrl' });
+  const titleValue = useWatch({ control, name: 'title' }) || '';
+  const authorValue = useWatch({ control, name: 'author' }) || '';
+  const descriptionValue = useWatch({ control, name: 'description' }) || '';
 
   const [selectedCategories, setSelectedCategories] = useState(initialCategories);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -224,24 +224,28 @@ export default function BookFormModal({ isOpen, onClose, book = null }) {
   useEffect(() => {
     if (book && isOpen) {
       reset({ ...book, imageUrl: book.imageUrl || book.bookImage?.url || '', categories: initialCategories, category: initialCategories[0] || '' });
-      setPreviewBookImage(book.imageUrl || book.bookImage?.url || '');
-      setSelectedFile(null);
-      setPreviewUrl('');
-      setUploadError('');
-      setUploadProgress(0);
-      setUploadStage('idle');
+      startTransition(() => {
+        setPreviewBookImage(book.imageUrl || book.bookImage?.url || '');
+        setSelectedFile(null);
+        setPreviewUrl('');
+        setUploadError('');
+        setUploadProgress(0);
+        setUploadStage('idle');
+      });
     } else if (!book && isOpen) {
       reset({
         title: '', author: '', category: '', categories: [], isbn: '', publisher: '',
         publishYear: new Date().getFullYear(), quantity: 1, description: '', imageUrl: '',
       });
-      setSelectedCategories([]);
-      setSelectedFile(null);
-      setPreviewUrl('');
-      setPreviewBookImage('');
-      setUploadError('');
-      setUploadProgress(0);
-      setUploadStage('idle');
+      startTransition(() => {
+        setSelectedCategories([]);
+        setSelectedFile(null);
+        setPreviewUrl('');
+        setPreviewBookImage('');
+        setUploadError('');
+        setUploadProgress(0);
+        setUploadStage('idle');
+      });
     }
   }, [book, isOpen, reset, initialCategories]);
 
@@ -254,50 +258,13 @@ export default function BookFormModal({ isOpen, onClose, book = null }) {
   }, []);
 
   useEffect(() => {
-    if (uploadStage === 'uploading') setAnnouncement('Uploading image to Cloudinary...');
-    else if (uploadStage === 'done') setAnnouncement('Image upload complete.');
-    else if (uploadStage === 'error') setAnnouncement(`Upload error: ${uploadError}`);
+    startTransition(() => {
+      if (uploadStage === 'uploading') setAnnouncement('Uploading image to Cloudinary...');
+      else if (uploadStage === 'done') setAnnouncement('Image upload complete.');
+      else if (uploadStage === 'error') setAnnouncement(`Upload error: ${uploadError}`);
+    });
   }, [uploadStage, uploadError]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handlePaste = async (event) => {
-      if (uploadStage === 'uploading' || uploadStage === 'validating' || uploadStage === 'requesting-signature') return;
-      const items = event.clipboardData?.items;
-      if (!items) return;
-
-      let imageFile = null;
-      for (let i = 0; i < items.length; i += 1) {
-        const item = items[i];
-        if (item.kind === 'file' && item.type.startsWith('image/')) {
-          const blob = item.getAsFile();
-          if (blob) {
-            const ext = mimeToExtension(blob.type);
-            const filename = `pasted-image-${Date.now()}.${ext}`;
-            imageFile = new File([blob], filename, { type: blob.type });
-            break;
-          }
-        }
-      }
-
-      if (imageFile) {
-        setAnnouncement('Pasted image detected, processing...');
-        toast('Image pasted from clipboard', { icon: '📋' });
-        await handleFileChange(imageFile);
-      }
-    };
-
-    const target = modalRef.current;
-    if (target) {
-      target.addEventListener('paste', handlePaste);
-    }
-    return () => {
-      if (target) {
-        target.removeEventListener('paste', handlePaste);
-      }
-    };
-  }, [isOpen, uploadStage]);
 
   const effectiveImage = useMemo(() => (
     selectedFile ? previewUrl : (imageUrl || previewBookImage)
@@ -355,7 +322,7 @@ export default function BookFormModal({ isOpen, onClose, book = null }) {
     if (fileInputRef.current) { fileInputRef.current.value = ''; }
   };
 
-  const handleFileChange = async (file) => {
+  const handleFileChange = useCallback(async (file) => {
     if (!file) return;
     if (uploadStage === 'uploading' || uploadStage === 'validating') return;
 
@@ -387,7 +354,48 @@ export default function BookFormModal({ isOpen, onClose, book = null }) {
       setSelectedFile(file);
       setUploadStage('idle');
     }
-  };
+  }, [uploadStage, previewUrl, setValue]);
+
+  // Paste handler — declared after handleFileChange to satisfy React Compiler ordering
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePaste = async (event) => {
+      if (uploadStage === 'uploading' || uploadStage === 'validating' || uploadStage === 'requesting-signature') return;
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      let imageFile = null;
+      for (let i = 0; i < items.length; i += 1) {
+        const item = items[i];
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          const blob = item.getAsFile();
+          if (blob) {
+            const ext = mimeToExtension(blob.type);
+            const filename = `pasted-image-${Date.now()}.${ext}`;
+            imageFile = new File([blob], filename, { type: blob.type });
+            break;
+          }
+        }
+      }
+
+      if (imageFile) {
+        setAnnouncement('Pasted image detected, processing...');
+        toast('Image pasted from clipboard', { icon: '📋' });
+        await handleFileChange(imageFile);
+      }
+    };
+
+    const target = modalRef.current;
+    if (target) {
+      target.addEventListener('paste', handlePaste);
+    }
+    return () => {
+      if (target) {
+        target.removeEventListener('paste', handlePaste);
+      }
+    };
+  }, [isOpen, uploadStage, handleFileChange]);
 
   const handleInputChange = (e) => {
     const file = e.target.files?.[0];
@@ -607,6 +615,7 @@ export default function BookFormModal({ isOpen, onClose, book = null }) {
             </div>
           )}
 
+          {/* eslint-disable-next-line react-hooks/refs */}
           <form id="book-form" onSubmit={handleSubmit(onSubmit)} className="space-y-8" noValidate>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               <div className="lg:col-span-8 space-y-8">

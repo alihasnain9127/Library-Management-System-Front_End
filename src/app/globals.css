@@ -1,8 +1,152 @@
 @import "tailwindcss";
 
+/* ============================================================
+   LuminaLib Design System (LibOS) — Formalized Token System
+   Tailwind CSS v4 @theme inline CSS Variables
+   ============================================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ── Canvas & Surface ──────────────────────────────────── */
+  --color-bg:              #f8fafc;
+  --color-surface:         #ffffff;
+  --color-surface-subtle:  #f1f5f9;
+
+  /* ── Borders ────────────────────────────────────────────── */
+  --color-border:          #e2e8f0;
+  --color-border-strong:   #3b82f6;
+
+  /* ── Text ───────────────────────────────────────────────── */
+  --color-text:            #0f172a;
+  --color-text-muted:      #64748b;
+
+  /* ── Brand Primary (Blue) ───────────────────────────────── */
+  --color-primary:         #2563eb;
+  --color-primary-hover:   #1d4ed8;
+  --color-primary-soft:    #eff6ff;
+
+  /* ── Semantic Colors ────────────────────────────────────── */
+  --color-success:         #059669;
+  --color-success-hover:   #047857;
+  --color-success-soft:    #ecfdf5;
+  --color-success-text:    #059669;
+
+  --color-warning:         #d97706;
+  --color-warning-hover:   #b45309;
+  --color-warning-soft:    #fffbeb;
+  --color-warning-text:    #d97706;
+
+  --color-danger:          #dc2626;
+  --color-danger-hover:    #b91c1c;
+  --color-danger-soft:     #fef2f2;
+  --color-danger-text:     #dc2626;
+
+  --color-admin-accent:    #9333ea;
+  --color-admin-hover:     #7e22ce;
+  --color-admin-soft:      #f3e8ff;
+  --color-admin-text:      #9333ea;
+
+  /* ── Shadow / Elevation ─────────────────────────────────── */
+  --shadow-e0: none;
+  --shadow-e1: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-e2: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-e3: 0 8px 24px rgba(15, 23, 42, 0.10);
+  --shadow-e4: 0 24px 64px rgba(15, 23, 42, 0.18);
+
+  /* ── Motion & Durations ─────────────────────────────────── */
+  --duration-fast:    150ms;
+  --duration-base:    200ms;
+  --duration-medium:  300ms;
+  --duration-slow:    400ms;
+  --ease-out:         cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:      cubic-bezier(0.45, 0, 0.55, 1);
+
+  /* ── Radius Scale ───────────────────────────────────────── */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-2xl:  24px;
+  --radius-full: 9999px;
+
+  /* ── Legacy Variable Compatibility ──────────────────────── */
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+/* Dark Mode Overrides via .dark class */
+.dark {
+  --color-bg:              #020617;
+  --color-surface:         #0f172a;
+  --color-surface-subtle:  rgba(30, 41, 59, 0.50);
+  --color-border:          #1e293b;
+  --color-border-strong:   #60a5fa;
+  --color-text:            #f8fafc;
+  --color-text-muted:      #94a3b8;
+  --color-primary:         #3b82f6;
+  --color-primary-hover:   #60a5fa;
+  --color-primary-soft:    rgba(30, 58, 138, 0.30);
+  --color-success:         #10b981;
+  --color-success-hover:   #34d399;
+  --color-success-soft:    rgba(6, 78, 59, 0.30);
+  --color-success-text:    #34d399;
+  --color-warning:         #f59e0b;
+  --color-warning-hover:   #fbbf24;
+  --color-warning-soft:    rgba(120, 53, 15, 0.30);
+  --color-warning-text:    #fbbf24;
+  --color-danger:          #ef4444;
+  --color-danger-hover:    #f87171;
+  --color-danger-soft:     rgba(69, 10, 10, 0.30);
+  --color-danger-text:     #f87171;
+  --color-admin-accent:    #a855f7;
+  --color-admin-hover:     #c084fc;
+  --color-admin-soft:      rgba(88, 28, 135, 0.30);
+  --color-admin-text:      #c084fc;
+  --shadow-e0: none;
+  --shadow-e1: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --shadow-e2: 0 4px 12px rgba(0, 0, 0, 0.40);
+  --shadow-e3: 0 8px 24px rgba(0, 0, 0, 0.50);
+  --shadow-e4: 0 24px 64px rgba(0, 0, 0, 0.60);
+  --background: #020617;
+  --foreground: #f8fafc;
+}
+
+/* Dark mode fallback for system preferences */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --color-bg:              #020617;
+    --color-surface:         #0f172a;
+    --color-surface-subtle:  rgba(30, 41, 59, 0.50);
+    --color-border:          #1e293b;
+    --color-border-strong:   #60a5fa;
+    --color-text:            #f8fafc;
+    --color-text-muted:      #94a3b8;
+    --color-primary:         #3b82f6;
+    --color-primary-hover:   #60a5fa;
+    --color-primary-soft:    rgba(30, 58, 138, 0.30);
+    --color-success:         #10b981;
+    --color-success-hover:   #34d399;
+    --color-success-soft:    rgba(6, 78, 59, 0.30);
+    --color-success-text:    #34d399;
+    --color-warning:         #f59e0b;
+    --color-warning-hover:   #fbbf24;
+    --color-warning-soft:    rgba(120, 53, 15, 0.30);
+    --color-warning-text:    #fbbf24;
+    --color-danger:          #ef4444;
+    --color-danger-hover:    #f87171;
+    --color-danger-soft:     rgba(69, 10, 10, 0.30);
+    --color-danger-text:     #f87171;
+    --color-admin-accent:    #a855f7;
+    --color-admin-hover:     #c084fc;
+    --color-admin-soft:      rgba(88, 28, 135, 0.30);
+    --color-admin-text:      #c084fc;
+    --shadow-e0: none;
+    --shadow-e1: 0 1px 2px rgba(0, 0, 0, 0.30);
+    --shadow-e2: 0 4px 12px rgba(0, 0, 0, 0.40);
+    --shadow-e3: 0 8px 24px rgba(0, 0, 0, 0.50);
+    --shadow-e4: 0 24px 64px rgba(0, 0, 0, 0.60);
+    --background: #020617;
+    --foreground: #f8fafc;
+  }
 }
 
 @theme inline {
@@ -12,19 +156,194 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ============================================================
+   Base Typography & Styles
+   ============================================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-geist-sans, Arial, sans-serif);
+  line-height: 1.5;
+  min-height: 100vh;
 }
 
 button {
   cursor: pointer;
+}
+
+/* ============================================================
+   Focus Rings — WCAG 2.2 AA Compliant
+   ============================================================ */
+:focus-visible {
+  outline: 2px solid var(--color-border-strong);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   Scrollbars
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+/* ============================================================
+   Text Selection
+   ============================================================ */
+::selection {
+  background: rgba(37, 99, 235, 0.15);
+  color: var(--color-text);
+}
+
+/* ============================================================
+   Animations & Keyframes
+   ============================================================ */
+@keyframes ping {
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+.ping {
+  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes zoom-in-95 {
+  from { transform: scale(0.95); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+@keyframes slide-up {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+
+.animate-in {
+  animation-fill-mode: both;
+}
+.fade-in {
+  animation-name: fade-in;
+}
+.zoom-in-95 {
+  animation-name: zoom-in-95;
+}
+.slide-up {
+  animation-name: slide-up;
+}
+.duration-150 { animation-duration: 150ms; }
+.duration-200 { animation-duration: 200ms; }
+.duration-300 { animation-duration: 300ms; }
+.duration-400 { animation-duration: 400ms; }
+
+/* ============================================================
+   Utility Classes & Primitives
+   ============================================================ */
+.glass-surface {
+  background: rgba(255, 255, 255, 0.80);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.dark .glass-surface {
+  background: rgba(15, 23, 42, 0.80);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Card Elevation Utilities */
+.shadow-e1 { box-shadow: var(--shadow-e1); }
+.shadow-e2 { box-shadow: var(--shadow-e2); }
+.shadow-e3 { box-shadow: var(--shadow-e3); }
+.shadow-e4 { box-shadow: var(--shadow-e4); }
+
+.card-interactive {
+  box-shadow: var(--shadow-e1);
+  transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out), border-color 200ms ease;
+}
+.card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-e2);
+}
+
+/* Micro-badges */
+.micro-badge {
+  font-size: 10px;
+  line-height: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Button Base Styles */
+.btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 150ms var(--ease-out);
+  outline: none;
+  user-select: none;
+}
+.btn-base:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.btn-base:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Input Fields */
+.input-standard {
+  height: 40px;
+  border-radius: 8px;
+  background-color: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 14px;
+  padding: 0 14px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.input-standard:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+/* ============================================================
+   Prefers Reduced Motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
