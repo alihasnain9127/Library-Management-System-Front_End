@@ -1,101 +1,29 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, Library, ArrowUpRight, ArrowDownRight, AlertTriangle,
   DollarSign, Activity, BookOpen, ChevronRight,
-  RefreshCw, Package
+  RefreshCw, Package, CheckCircle2, ShieldAlert
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, BarChart, Bar, Cell
 } from 'recharts';
+import api from '@/services/api';
+import toast from 'react-hot-toast';
 
-// ── Metric Data (6 KPI Tiles) ───────────────────────────────
-const metricData = [
-  {
-    title: 'Total Members',
-    value: '1,248',
-    icon: Users,
-    change: '+12%',
-    changeLabel: 'this month',
-    trend: 'up',
-    type: 'info',
-  },
-  {
-    title: 'Book Catalog',
-    value: '8,432',
-    icon: Library,
-    change: '+142',
-    changeLabel: 'new entries',
-    trend: 'up',
-    type: 'info',
-  },
-  {
-    title: 'Currently Issued',
-    value: '312',
-    icon: BookOpen,
-    change: '64%',
-    changeLabel: 'active utilization',
-    trend: 'up',
-    type: 'success',
-  },
-  {
-    title: 'Overdue Rotations',
-    value: '24',
-    icon: AlertTriangle,
-    change: 'Action',
-    changeLabel: 'required now',
-    trend: 'down',
-    type: 'danger',
-  },
-  {
-    title: 'Pending Fines',
-    value: 'Rs. 4,820',
-    icon: DollarSign,
-    change: 'Rs. 1,200',
-    changeLabel: 'collected today',
-    trend: 'up',
-    type: 'warning',
-  },
-  {
-    title: 'System Health',
-    value: '99.8%',
-    icon: Activity,
-    change: 'All APIs',
-    changeLabel: 'operational',
-    trend: 'up',
-    type: 'success',
-  },
-];
+const CACHE_KEY = 'libos_admin_dashboard_cache_v1';
+const CACHE_TTL_MS = 30 * 1000; // 30 seconds client-side freshness window
 
-const monthlyCirculation = [
-  { day: '05 May', issued: 45, returned: 32 },
-  { day: '10 May', issued: 62, returned: 48 },
-  { day: '15 May', issued: 85, returned: 71 },
-  { day: '20 May', issued: 54, returned: 65 },
-  { day: '25 May', issued: 95, returned: 82 },
-];
-
-const topBooks = [
-  { name: 'Clean Code', borrows: 145, color: '#3b82f6' },
-  { name: 'Designing Data Apps', borrows: 122, color: '#6366f1' },
-  { name: "You Don't Know JS", borrows: 98, color: '#10b981' },
-  { name: 'The Pragmatic Programmer', borrows: 87, color: '#f59e0b' },
-  { name: 'Intro to Algorithms', borrows: 64, color: '#ef4444' },
-];
-
-const overdueAlerts = [
-  { book: 'Introduction to Algorithms', user: 'Arsalan Khan', days: 14, fine: 280 },
-  { book: 'Cracking the Coding Interview', user: 'Zainab Malik', days: 9, fine: 180 },
-  { book: 'Head First Design Patterns', user: 'Bilal Ahmed', days: 7, fine: 140 },
-];
-
-const depletedStock = [
-  { book: 'Designing Data-Intensive Applications', category: 'Engineering', remaining: 0 },
-  { book: 'Compilers: Principles, Techniques', category: 'Computer Science', remaining: 1 },
-  { book: 'Discrete Mathematics', category: 'Mathematics', remaining: 2 },
-];
+const ICON_MAP = {
+  members: Users,
+  catalog: Library,
+  issued: BookOpen,
+  overdue: AlertTriangle,
+  fines: DollarSign,
+  health: Activity,
+};
 
 // ── Glass Tooltip ───────────────────────────────────────────
 function CustomTooltip({ active, payload, label }) {
@@ -115,7 +43,7 @@ function CustomTooltip({ active, payload, label }) {
 
 // ── Metric Card ──────────────────────────────────────────────
 function MetricCard({ card }) {
-  const Icon = card.icon;
+  const Icon = ICON_MAP[card.id] || card.icon || Activity;
   const colorMap = {
     danger:  { icon: 'bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400 border-red-100 dark:border-red-900/30' },
     warning: { icon: 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border-amber-100 dark:border-amber-900/30' },
@@ -143,7 +71,7 @@ function MetricCard({ card }) {
         </div>
       </div>
 
-      {/* Big Display Metric (36-40px, font-extrabold, tracking-tight) */}
+      {/* Big Display Metric */}
       <p className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50 mb-2">
         {card.value}
       </p>
@@ -160,31 +88,172 @@ function MetricCard({ card }) {
 
 // ── Main Component ───────────────────────────────────────────
 export default function StatsDashboard() {
-  const [mounted, setMounted] = useState(false);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastSynced, setLastSynced] = useState(null);
+  const [timeAgoText, setTimeAgoText] = useState('syncing…');
+  const [error, setError] = useState(null);
 
+  // Read initial cache from sessionStorage for instant zero-latency paint
   useEffect(() => {
-    const id = setTimeout(() => setMounted(true), 0);
-    return () => clearTimeout(id);
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.data) {
+          setData(parsed.data);
+          setLastSynced(new Date(parsed.timestamp));
+          setLoading(false);
+        }
+      }
+    } catch {
+      // Ignore sessionStorage parsing errors
+    }
   }, []);
 
-  if (!mounted) {
+  // Fetch real-time dashboard data from backend
+  const fetchDashboardData = useCallback(async (isManual = false) => {
+    if (isManual) setRefreshing(true);
+    setError(null);
+
+    try {
+      const url = isManual ? '/reports/dashboard-stats?refresh=true' : '/reports/dashboard-stats';
+      const response = await api.get(url);
+      const resData = response.data?.data;
+
+      if (resData) {
+        setData(resData);
+        const syncTime = new Date();
+        setLastSynced(syncTime);
+        try {
+          sessionStorage.setItem(
+            CACHE_KEY,
+            JSON.stringify({ data: resData, timestamp: syncTime.getTime() })
+          );
+        } catch {
+          // Ignore quota errors
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load real-time analytics:', err);
+      setError(err?.response?.data?.message || 'Unable to sync live analytics');
+      if (isManual) {
+        toast.error('Failed to refresh dashboard data.');
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // Initial fetch and auto-polling every 30 seconds
+  useEffect(() => {
+    fetchDashboardData(false);
+
+    const intervalId = setInterval(() => {
+      fetchDashboardData(false);
+    }, CACHE_TTL_MS);
+
+    // Refresh when tab regains visibility/focus
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchDashboardData(false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchDashboardData]);
+
+  // Sync elapsed timer ticker (e.g. "Synced just now", "Synced 15s ago")
+  useEffect(() => {
+    if (!lastSynced) return;
+
+    const updateTimer = () => {
+      const elapsedSec = Math.floor((Date.now() - lastSynced.getTime()) / 1000);
+      if (elapsedSec < 5) {
+        setTimeAgoText('Synced just now');
+      } else if (elapsedSec < 60) {
+        setTimeAgoText(`Synced ${elapsedSec}s ago`);
+      } else {
+        const mins = Math.floor(elapsedSec / 60);
+        setTimeAgoText(`Synced ${mins}m ago`);
+      }
+    };
+
+    updateTimer();
+    const timerId = setInterval(updateTimer, 5000);
+    return () => clearInterval(timerId);
+  }, [lastSynced]);
+
+  if (loading && !data) {
     return (
       <div className="h-96 w-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-slate-400">
-          <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
-          <span className="text-sm font-medium">Loading library analytics…</span>
+          <RefreshCw className="w-7 h-7 animate-spin text-blue-500" />
+          <span className="text-sm font-medium">Aggregating real-time library analytics…</span>
         </div>
       </div>
     );
   }
 
+  const metrics = data?.metrics || [];
+  const monthlyCirculation = data?.monthlyCirculation || [];
+  const topBooks = data?.topBooks || [];
+  const overdueAlerts = data?.overdueAlerts || [];
+  const depletedStock = data?.depletedStock || [];
+
   return (
     <div className="space-y-8">
 
+      {/* ── Real-Time Sync & Status Header Bar ───────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/70 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-3.5 backdrop-blur-md">
+        <div className="flex items-center gap-2.5 text-xs text-slate-500 dark:text-slate-400">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span className="font-semibold text-slate-700 dark:text-slate-300">Live Backend Stream</span>
+          <span>•</span>
+          <span>{timeAgoText}</span>
+          {data?.cachedAt && (
+            <span className="hidden md:inline text-[11px] text-slate-400">
+              (Server cache TTL: 30s)
+            </span>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => fetchDashboardData(true)}
+          disabled={refreshing}
+          className="h-8 px-3.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-600 dark:hover:text-white font-semibold text-xs rounded-xl transition-all duration-150 flex items-center gap-2 border border-blue-200/60 dark:border-blue-800/40 shadow-sm active:scale-[0.98] self-start sm:self-auto disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          <span>{refreshing ? 'Refreshing…' : 'Sync Now'}</span>
+        </button>
+      </div>
+
+      {error && !data && (
+        <div className="p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 rounded-2xl flex items-center justify-between text-sm text-red-600 dark:text-red-400">
+          <span>{error}</span>
+          <button
+            onClick={() => fetchDashboardData(true)}
+            className="px-3 py-1 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* ── 1. KPI Metric Tiles ───────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-        {metricData.map((card, idx) => (
-          <MetricCard key={idx} card={card} />
+        {metrics.map((card, idx) => (
+          <MetricCard key={card.id || idx} card={card} />
         ))}
       </div>
 
@@ -198,7 +267,7 @@ export default function StatsDashboard() {
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-6">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-slate-50 tracking-tight">Circulation Trends</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Books issued vs returned over time</p>
+              <p className="text-xs text-slate-400 mt-0.5">Real-time loans issued vs returned over past 14 days</p>
             </div>
             <div className="flex items-center gap-4 text-xs font-semibold">
               <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
@@ -209,6 +278,7 @@ export default function StatsDashboard() {
               </span>
             </div>
           </div>
+
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={monthlyCirculation} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
@@ -233,6 +303,7 @@ export default function StatsDashboard() {
                   tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }}
                   tickLine={false}
                   axisLine={false}
+                  allowDecimals={false}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Area 
@@ -269,30 +340,39 @@ export default function StatsDashboard() {
         >
           <div className="mb-6">
             <h3 className="text-base font-bold text-slate-900 dark:text-slate-50 tracking-tight">High Velocity Titles</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Top 5 most borrowed books</p>
+            <p className="text-xs text-slate-400 mt-0.5">Top 5 most borrowed library books</p>
           </div>
+
           <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topBooks} layout="vertical" margin={{ top: 0, right: 12, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" className="dark:stroke-slate-800" />
-                <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={90}
-                  tickFormatter={(v) => v.length > 14 ? v.slice(0, 14) + '…' : v}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="borrows" radius={[0, 6, 6, 0]} barSize={12}>
-                  {topBooks.map((entry, idx) => (
-                    <Cell key={`cell-${idx}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {topBooks.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-slate-400">
+                <BookOpen className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
+                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">No circulation velocity yet</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Top titles will appear as books are checked out.</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topBooks} layout="vertical" margin={{ top: 0, right: 12, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" className="dark:stroke-slate-800" />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={90}
+                    tickFormatter={(v) => v.length > 14 ? v.slice(0, 14) + '…' : v}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="borrows" radius={[0, 6, 6, 0]} barSize={12}>
+                    {topBooks.map((entry, idx) => (
+                      <Cell key={`cell-${idx}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>
@@ -307,28 +387,41 @@ export default function StatsDashboard() {
         >
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
             <h3 className="font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2 text-sm">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+              <span className={`w-2.5 h-2.5 rounded-full ${overdueAlerts.length > 0 ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
               Critical Overdue Accounts
             </h3>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-2.5 py-1 rounded-full border border-red-200/50 dark:border-red-900/40">
-              Action Required
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+              overdueAlerts.length > 0
+                ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border-red-200/50 dark:border-red-900/40'
+                : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/50 dark:border-emerald-900/40'
+            }`}>
+              {overdueAlerts.length > 0 ? 'Action Required' : 'All Clear'}
             </span>
           </div>
+
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {overdueAlerts.map((alert, idx) => (
-              <div key={idx} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 line-clamp-1">{alert.book}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Borrower: <span className="font-medium text-slate-600 dark:text-slate-300">{alert.user}</span>
-                  </p>
-                </div>
-                <div className="text-right shrink-0 ml-4">
-                  <span className="text-sm font-bold text-red-600 dark:text-red-400">{alert.days} Days Late</span>
-                  <p className="text-xs text-slate-400 mt-0.5">Rs. {alert.fine} accrued</p>
-                </div>
+            {overdueAlerts.length === 0 ? (
+              <div className="px-6 py-10 text-center flex flex-col items-center justify-center gap-2">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">No Overdue Borrowers</p>
+                <p className="text-xs text-slate-400">All active student and faculty book loans are within due date limits.</p>
               </div>
-            ))}
+            ) : (
+              overdueAlerts.map((alert, idx) => (
+                <div key={alert._id || idx} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 line-clamp-1">{alert.book}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Borrower: <span className="font-medium text-slate-600 dark:text-slate-300">{alert.user}</span>
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0 ml-4">
+                    <span className="text-sm font-bold text-red-600 dark:text-red-400">{alert.days} Days Late</span>
+                    <p className="text-xs text-slate-400 mt-0.5">Rs. {alert.fine} accrued</p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -342,28 +435,41 @@ export default function StatsDashboard() {
               <Package className="w-4 h-4 text-amber-500" />
               Depleted Stock Watchlist
             </h3>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-full border border-amber-200/50 dark:border-amber-900/40">
-              Low Stock
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+              depletedStock.length > 0
+                ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200/50 dark:border-amber-900/40'
+                : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/50 dark:border-emerald-900/40'
+            }`}>
+              {depletedStock.length > 0 ? 'Low Stock' : 'Stock Optimal'}
             </span>
           </div>
+
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {depletedStock.map((stock, idx) => (
-              <div key={idx} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 line-clamp-1">{stock.book}</p>
-                  <span className="inline-block text-[10px] font-semibold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md mt-1">
-                    {stock.category}
+            {depletedStock.length === 0 ? (
+              <div className="px-6 py-10 text-center flex flex-col items-center justify-center gap-2">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Catalog Inventory Healthy</p>
+                <p className="text-xs text-slate-400">All registered library books currently have adequate stock on shelves.</p>
+              </div>
+            ) : (
+              depletedStock.map((stock, idx) => (
+                <div key={stock._id || idx} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 line-clamp-1">{stock.book}</p>
+                    <span className="inline-block text-[10px] font-semibold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md mt-1">
+                      {stock.category}
+                    </span>
+                  </div>
+                  <span className={`shrink-0 ml-4 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                    stock.remaining === 0
+                      ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200/50 dark:border-red-900/40'
+                      : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/40'
+                  }`}>
+                    {stock.remaining === 0 ? 'Out of Stock' : `${stock.remaining} Left`}
                   </span>
                 </div>
-                <span className={`shrink-0 ml-4 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
-                  stock.remaining === 0
-                    ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200/50 dark:border-red-900/40'
-                    : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/40'
-                }`}>
-                  {stock.remaining === 0 ? 'Out of Stock' : `${stock.remaining} Left`}
-                </span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
