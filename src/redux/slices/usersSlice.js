@@ -19,6 +19,15 @@ export const toggleUserSuspension = createAsyncThunk('users/toggleSuspension', a
   }
 });
 
+export const createAdminUser = createAsyncThunk('users/createAdmin', async (adminData, { rejectWithValue }) => {
+  try {
+    const response = await api.post('/users/create-admin', adminData);
+    return response.data.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || 'Failed to create administrator account');
+  }
+});
+
 // Self-Service User Thunks
 export const updateSelfProfile = createAsyncThunk('users/updateSelf', async (profileData, { rejectWithValue }) => {
   try {
@@ -35,6 +44,8 @@ const usersSlice = createSlice({
     list: [],
     loading: false,
     actionLoading: false,
+    createLoading: false,
+    createError: null,
     error: null,
   },
   reducers: {},
@@ -55,7 +66,18 @@ const usersSlice = createSlice({
         const index = state.list.findIndex(u => u._id === action.payload._id);
         if (index !== -1) state.list[index] = action.payload;
       })
-      .addCase(toggleUserSuspension.rejected, (state) => { state.actionLoading = false; });
+      .addCase(toggleUserSuspension.rejected, (state) => { state.actionLoading = false; })
+
+      // Create Admin
+      .addCase(createAdminUser.pending, (state) => { state.createLoading = true; state.createError = null; })
+      .addCase(createAdminUser.fulfilled, (state, action) => {
+        state.createLoading = false;
+        if (action.payload) state.list.unshift(action.payload);
+      })
+      .addCase(createAdminUser.rejected, (state, action) => {
+        state.createLoading = false;
+        state.createError = action.payload;
+      });
   },
 });
 
