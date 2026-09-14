@@ -104,7 +104,7 @@ export default function AdminSettingsPage() {
               <input 
                 type="text" 
                 disabled
-                value="Fiction, Non-Fiction, Science, History, Tech, Other"
+                value="Biography, Business, Classic, Fantasy, Fiction, Finance, History, Memoir, Mystery, Non-Fiction, Philosophy, Psychology, Science, Science Fiction, Self-Help, Technology, Thriller, Other"
                 className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/60 text-sm text-slate-500 dark:text-slate-400 cursor-not-allowed"
               />
               <p className="text-xs text-slate-400 mt-1">Core taxonomy applied across catalog search and filters.</p>

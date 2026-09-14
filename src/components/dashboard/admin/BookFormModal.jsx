@@ -21,7 +21,26 @@ const ALLOWED_MIME_TYPES = Object.freeze([
 
 const ALLOWED_EXTENSIONS = Object.freeze(['png', 'jpg', 'jpeg', 'webp']);
 const MAX_FILE_SIZE_BYTES = 4 * 1024 * 1024;
-const CATEGORY_OPTIONS = Object.freeze(['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Other']);
+const CATEGORY_OPTIONS = Object.freeze([
+  'Biography',
+  'Business',
+  'Classic',
+  'Fantasy',
+  'Fiction',
+  'Finance',
+  'History',
+  'Memoir',
+  'Mystery',
+  'Non-Fiction',
+  'Philosophy',
+  'Psychology',
+  'Science',
+  'Science Fiction',
+  'Self-Help',
+  'Technology',
+  'Thriller',
+  'Other',
+]);
 const MAGIC_BYTES = Object.freeze([
   { offset: 0,
     bytes: [0x89, 0x50, 0x4E, 0x47],

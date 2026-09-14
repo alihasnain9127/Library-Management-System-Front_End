@@ -5,11 +5,23 @@ const STORAGE_KEY = 'lms_custom_categories';
 
 /** Built-in predefined categories always available */
 const BUILTIN_CATEGORIES = [
+  'Biography',
+  'Business',
+  'Classic',
+  'Fantasy',
   'Fiction',
-  'Non-Fiction',
-  'Science',
+  'Finance',
   'History',
+  'Memoir',
+  'Mystery',
+  'Non-Fiction',
+  'Philosophy',
+  'Psychology',
+  'Science',
+  'Science Fiction',
+  'Self-Help',
   'Technology',
+  'Thriller',
   'Other',
 ];
 
