@@ -8,6 +8,8 @@ import {
   X, Save, Loader2, Upload, Image as ImageIcon, Trash2, AlertCircle, CheckCircle2, CloudUpload, RefreshCw, Plus, ClipboardPaste } from 'lucide-react';
 import api from '@/services/api';
 import { addBook, updateBook } from '@/redux/slices/booksSlice';
+import { fetchCategories, createCategory } from '@/redux/slices/categoriesSlice';
+import CustomSelect from '@/components/ui/CustomSelect';
 import toast from 'react-hot-toast';
 
 const ALLOWED_MIME_TYPES = Object.freeze([
@@ -177,6 +179,7 @@ function CharCounter({ current, max }) {
 export default function BookFormModal({ isOpen, onClose, book = null }) {
   const dispatch = useDispatch();
   const { actionLoading, error } = useSelector((state) => state.books);
+  const { list: categoryList, createLoading: categoryCreateLoading } = useSelector((state) => state.categories);
   const isEditing = !!book;
 
   const initialCategories = useMemo(() => {
@@ -219,7 +222,11 @@ export default function BookFormModal({ isOpen, onClose, book = null }) {
       setValue('categories', initialCategories, { shouldValidate: false, shouldDirty: false });
       setValue('category', initialCategories[0], { shouldValidate: false, shouldDirty: false });
     }
-  }, [isOpen, initialCategories, setValue]);
+    // Fetch/refresh the categories list whenever the modal opens
+    if (isOpen) {
+      dispatch(fetchCategories());
+    }
+  }, [isOpen, initialCategories, setValue, dispatch]);
 
   useEffect(() => {
     if (book && isOpen) {
@@ -298,10 +305,19 @@ export default function BookFormModal({ isOpen, onClose, book = null }) {
     }
   };
 
-  const onCategoryDropdownChange = (event) => {
-    const value = event.target.value;
-    event.target.value = '';
+  const onCategoryDropdownChange = (value) => {
     addCategory(value);
+  };
+
+  const onCreateCategoryTag = async (name) => {
+    const result = await dispatch(createCategory(name));
+    if (createCategory.fulfilled.match(result)) {
+      const saved = result.payload.name;
+      addCategory(saved);
+      toast.success(`Tag "${saved}" created!`);
+    } else {
+      toast.error(result.payload || 'Could not create tag');
+    }
   };
 
   const chooseFile = () => {
@@ -691,38 +707,21 @@ export default function BookFormModal({ isOpen, onClose, book = null }) {
                         </div>
                       )}
 
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <select
-                          id="category-dropdown"
-                          onChange={onCategoryDropdownChange}
-                          defaultValue=""
-                          aria-invalid={!!errors.categories}
-                          aria-describedby={errors.categories ? "categories-error" : undefined}
-                          className={`flex-1 h-11 px-3.5 rounded-lg border ${errors.categories ? 'border-red-500 focus:ring-red-500' : 'border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-blue-500'} bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-offset-0 transition-shadow`}
-                        >
-                          <option value="" disabled>Select a category to add...</option>
-                          {CATEGORY_OPTIONS.map((option) => (
-                            <option key={option} value={option} disabled={selectedCategories.includes(option)}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const select = document.getElementById('category-dropdown');
-                            if (select && select.value) {
-                              addCategory(select.value);
-                              select.value = '';
-                            } else {
-                              toast('Pick a category from the dropdown to add', { icon: '💡' });
-                            }
-                          }}
-                          className="h-11 px-4 rounded-lg bg-blue-600 text-white font-medium flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 min-h-[44px]"
-                        >
-                          <Plus className="w-4 h-4" /> Add More Categories
-                        </button>
-                      </div>
+                      {/* Custom dropdown with free-text tag creation */}
+                      <CustomSelect
+                        id="category-dropdown"
+                        options={categoryList
+                          .filter((cat) => !selectedCategories.includes(cat))
+                          .map((cat) => ({ value: cat, label: cat }))}
+                        value=""
+                        onChange={onCategoryDropdownChange}
+                        placeholder="Search or type a tag name…"
+                        allowCreate
+                        onCreateOption={onCreateCategoryTag}
+                        createLoading={categoryCreateLoading}
+                        searchable
+                        hasError={!!errors.categories}
+                      />
                       {errors.categories && <p id="categories-error" className="text-sm text-red-600 dark:text-red-400 mt-1.5 flex items-center gap-1.5"><AlertCircle className="w-4 h-4" />{errors.categories.message}</p>}
                     </div>
                   </div>

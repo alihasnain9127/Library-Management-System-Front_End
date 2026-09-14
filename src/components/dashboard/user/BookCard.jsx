@@ -2,9 +2,9 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { Star, BookOpen, AlertCircle } from 'lucide-react';
+import { Star, BookOpen, AlertCircle, BookMarked } from 'lucide-react';
 
-export default function BookCard({ book, onClick }) {
+export default function BookCard({ book, onClick, isBorrowed = false }) {
   const isAvailable = (book.available ?? 0) > 0;
   const coverSrc = book.imageUrl || book.bookImage?.url || book.image || '';
   const totalCopies = book.quantity ?? book.total ?? 1;
@@ -22,7 +22,11 @@ export default function BookCard({ book, onClick }) {
         } 
       }}
       aria-label={`View details for ${book.title}`}
-      className="group flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 hover:-translate-y-1 hover:border-blue-300 dark:hover:border-blue-700 select-none"
+      className={`group flex flex-col bg-white dark:bg-slate-900 border rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 hover:-translate-y-1 select-none ${
+        isBorrowed
+          ? 'border-violet-300 dark:border-violet-700 hover:border-violet-400 dark:hover:border-violet-600'
+          : 'border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700'
+      }`}
       style={{ boxShadow: 'var(--shadow-e1)' }}
       onMouseEnter={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-e2)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-e1)'; }}
@@ -45,7 +49,12 @@ export default function BookCard({ book, onClick }) {
         )}
 
         {/* Top-right glass availability badge */}
-        <div className="absolute top-3 right-3">
+        <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
+          {isBorrowed && (
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] px-2.5 py-1 rounded-full backdrop-blur-md shadow-sm bg-violet-600/90 text-white">
+              Borrowed
+            </span>
+          )}
           <span className={`text-[10px] font-bold uppercase tracking-[0.08em] px-2.5 py-1 rounded-full backdrop-blur-md shadow-sm ${
             isAvailable
               ? 'bg-emerald-500/90 text-white'
@@ -87,15 +96,21 @@ export default function BookCard({ book, onClick }) {
         {/* Footer: X of Y copies */}
         <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            {isAvailable ? (
+            {isBorrowed ? (
+              <BookMarked className="w-3.5 h-3.5 text-violet-500" />
+            ) : isAvailable ? (
               <BookOpen className="w-3.5 h-3.5 text-emerald-500" />
             ) : (
               <AlertCircle className="w-3.5 h-3.5 text-red-400" />
             )}
             <span>{availableCopies} of {totalCopies} copies</span>
           </span>
-          <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 group-hover:translate-x-0.5 transition-transform duration-150">
-            Borrow →
+          <span className={`text-[11px] font-semibold group-hover:translate-x-0.5 transition-transform duration-150 ${
+            isBorrowed
+              ? 'text-violet-600 dark:text-violet-400'
+              : 'text-blue-600 dark:text-blue-400'
+          }`}>
+            {isBorrowed ? 'Already Borrowed' : 'Borrow →'}
           </span>
         </div>
       </div>

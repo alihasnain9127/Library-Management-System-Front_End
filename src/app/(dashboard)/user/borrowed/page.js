@@ -211,7 +211,12 @@ export default function UserBorrowedAndFinesView() {
             actionLoading={actionLoading}
           />
         ) : (
-          <UserLedgerList records={recordsView} loading={loading} />
+          <UserLedgerList
+            records={recordsView}
+            loading={loading}
+            onReturn={(id) => setReturnConfirmId(id)}
+            actionLoading={actionLoading}
+          />
         )}
       </div>
 
@@ -220,8 +225,8 @@ export default function UserBorrowedAndFinesView() {
         isOpen={!!returnConfirmId}
         onClose={() => setReturnConfirmId(null)}
         onConfirm={confirmReturn}
-        title="Process Book Return"
-        message="Confirm this book has been safely received at the circulation desk?"
+        title="Return This Book"
+        message="Please confirm you are returning this book to the library desk. This action cannot be undone."
         confirmText="Confirm Return"
         isDanger={false}
       />
@@ -276,7 +281,7 @@ function AdminScopeToggle({ scope, onChange, disabled }) {
 /* -------------------------------------------------------------------------- */
 /*  User ledger list (card style for patron)                                  */
 /* -------------------------------------------------------------------------- */
-function UserLedgerList({ records, loading }) {
+function UserLedgerList({ records, loading, onReturn, actionLoading }) {
   if (loading) {
     return (
       <div className="p-12 text-center text-slate-400 flex flex-col items-center gap-2">
@@ -360,6 +365,18 @@ function UserLedgerList({ records, loading }) {
                   </span>
                 )}
               </div>
+
+              {/* Return button — only for active (non-returned) loans */}
+              {!isReturned && typeof onReturn === 'function' && (
+                <button
+                  type="button"
+                  onClick={() => onReturn(rec._id)}
+                  disabled={actionLoading}
+                  className="h-8 px-3 bg-teal-50 text-teal-700 hover:bg-teal-600 hover:text-white dark:bg-teal-950/40 dark:text-teal-300 dark:hover:bg-teal-600 dark:hover:text-white font-semibold text-xs rounded-lg transition-all duration-150 inline-flex items-center gap-1.5 border border-teal-200/60 dark:border-teal-800/40 shadow-sm disabled:opacity-60 shrink-0"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Return Book
+                </button>
+              )}
             </div>
           </div>
         );

@@ -3,6 +3,7 @@ import authReducer from './slices/authSlice';
 import usersReducer from './slices/usersSlice';
 import booksReducer from './slices/booksSlice';
 import circulationReducer from './slices/circulationSlice';
+import categoriesReducer from './slices/categoriesSlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,5 +11,6 @@ export const store = configureStore({
     users: usersReducer,
     books: booksReducer,
     circulation: circulationReducer,
+    categories: categoriesReducer,
   },
 });

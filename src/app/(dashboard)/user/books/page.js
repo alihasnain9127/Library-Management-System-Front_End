@@ -1,16 +1,20 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, Filter, Loader2, BookX, BookOpen, X } from 'lucide-react';
+import { Search, Loader2, BookX, BookOpen, X } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchBooks } from '@/redux/slices/booksSlice';
+import { fetchCirculationRecords } from '@/redux/slices/circulationSlice';
 import { useSearch } from '@/hooks/useSearch';
 import BookCard from '@/components/dashboard/user/BookCard';
 import BookDetailModal from '@/components/dashboard/user/BookDetailModal';
+import CustomSelect from '@/components/ui/CustomSelect';
 
 export default function BrowseBooksPage() {
   const dispatch = useDispatch();
   const { items: books, loading, error } = useSelector((state) => state.books);
+  const { records } = useSelector((state) => state.circulation);
+  const { list: categoryList } = useSelector((state) => state.categories);
 
   const { searchTerm, setSearchTerm, filters, setFilters, debouncedSearchTerm, debouncedFilters } = useSearch(400);
   const [selectedBook, setSelectedBook] = useState(null);
@@ -23,6 +27,24 @@ export default function BrowseBooksPage() {
       available: debouncedFilters.status === 'Available' ? true : undefined 
     }));
   }, [dispatch, debouncedSearchTerm, debouncedFilters]);
+
+  // Fetch user's own circulation records to know which books they currently have out
+  useEffect(() => {
+    dispatch(fetchCirculationRecords('user'));
+  }, [dispatch]);
+
+  // Build a set of bookIds the user currently has borrowed (not yet returned)
+  const borrowedBookIds = useMemo(() => {
+    const ids = new Set();
+    records.forEach((r) => {
+      const statusLow = String(r.status || '').toLowerCase();
+      if (statusLow === 'borrowed' || statusLow === 'issued') {
+        const id = typeof r.bookId === 'object' ? (r.bookId?._id || r.bookId?.id) : r.bookId;
+        if (id) ids.add(id);
+      }
+    });
+    return ids;
+  }, [records]);
 
   const handleBorrowed = useCallback((payload) => {
     const borrowedBookId =
@@ -46,8 +68,17 @@ export default function BrowseBooksPage() {
     [books, borrowedOverrides],
   );
 
-  const categories = ['All', 'Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Other'];
-  const statuses = ['All', 'Available', 'Borrowed'];
+  // Derive category options for the filter from Redux (includes custom tags)
+  const categoryOptions = useMemo(() => [
+    { value: 'All', label: 'All Categories' },
+    ...categoryList.map((c) => ({ value: c, label: c })),
+  ], [categoryList]);
+
+  const statusOptions = [
+    { value: 'All', label: 'All Availability' },
+    { value: 'Available', label: 'Available' },
+    { value: 'Borrowed', label: 'Borrowed' },
+  ];
 
   const clearAllFilters = () => {
     setSearchTerm('');
@@ -104,31 +135,30 @@ export default function BrowseBooksPage() {
 
         {/* Filters Group */}
         <div className="flex flex-wrap sm:flex-nowrap gap-3">
-          <div className="relative w-full sm:w-48">
-            <Filter className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-            <select
+          {/* Category filter */}
+          <div className="w-full sm:w-52">
+            <CustomSelect
+              options={categoryOptions}
               value={filters.category}
-              onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-              className="w-full h-10 pl-9 pr-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500"
-            >
-              {categories.map(cat => <option key={cat} value={cat}>{cat === 'All' ? 'All Categories' : cat}</option>)}
-            </select>
+              onChange={(val) => setFilters({ ...filters, category: val })}
+              placeholder="All Categories"
+            />
           </div>
 
-          <div className="w-full sm:w-40">
-            <select
+          {/* Availability filter */}
+          <div className="w-full sm:w-44">
+            <CustomSelect
+              options={statusOptions}
               value={filters.status}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              className="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500"
-            >
-              {statuses.map(status => <option key={status} value={status}>{status === 'All' ? 'All Availability' : status}</option>)}
-            </select>
+              onChange={(val) => setFilters({ ...filters, status: val })}
+              placeholder="All Availability"
+            />
           </div>
 
           {hasActiveFilters && (
             <button
               onClick={clearAllFilters}
-              className="h-10 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shrink-0"
+              className="h-11 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shrink-0"
             >
               Reset
             </button>
@@ -156,6 +186,7 @@ export default function BrowseBooksPage() {
                 key={book.id || book._id}
                 book={book}
                 onClick={() => setSelectedBook(book)}
+                isBorrowed={borrowedBookIds.has(book._id || book.id)}
               />
             ))}
           </div>
@@ -182,6 +213,7 @@ export default function BrowseBooksPage() {
         isOpen={!!selectedBook}
         onClose={() => setSelectedBook(null)}
         onBorrowed={handleBorrowed}
+        isBorrowed={selectedBook ? borrowedBookIds.has(selectedBook._id || selectedBook.id) : false}
       />
     </div>
   );
